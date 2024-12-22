@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import tempfile
-import os
+from functools import reduce
+
 
 st.title("CSV Merger Application")
 
@@ -11,8 +12,8 @@ uploaded_files = st.file_uploader("Upload one or more CSV files", type=["csv"], 
 
 if uploaded_files:
     st.subheader("Uploaded Files Preview")
-    dataframes = {}
-    selected_columns = {}
+    dataframes = []
+    columns = []
     
     # Display previews and allow column selection for each file
     for i, uploaded_file in enumerate(uploaded_files):
@@ -20,14 +21,19 @@ if uploaded_files:
         st.write(f"Preview of **{uploaded_file.name}**:")
         st.dataframe(df.head())
         
-        # Allow column selection for this file
-        columns = df.columns.tolist()
-        selected_columns[uploaded_file.name] = st.multiselect(
-            f"Select columns to include from **{uploaded_file.name}**",
-            columns,
-            key=f"columns_{i}"
+        key_column = st.selectbox(
+            f"Select key",
+            df.columns.tolist()
         )
-        dataframes[uploaded_file.name] = df
+        select_columns = st.multiselect(
+            f"Select columns",
+            df.columns.tolist()
+        )
+        df['key'] = df[key_column]
+        select_columns.append('key')
+        df = df[select_columns]
+        dataframes.append(df)
+
 # Step 2: Merge Selected Data
 if uploaded_files:
     st.header("Step 2: Merge Data")
@@ -36,16 +42,8 @@ if uploaded_files:
 
     if merge_button:
         merged_data = pd.DataFrame()
-        for file_name, df in dataframes.items():
-            selected_cols = selected_columns[file_name]
-            if selected_cols:
-                print(merged_data)
-                # Add selected columns to the merged dataframe
-                if merged_data.empty:
-                    merged_data = df[selected_cols]
-                else:
-                    merged_data = pd.concat([merged_data, df[selected_cols]], axis=1)
-        
+        merged_data = reduce(lambda left, right: pd.merge(left, right, on='key'), dataframes) 
+        merged_data = merged_data.drop('key', axis=1)
         st.write("Merged Data Preview:")
         st.dataframe(merged_data)
 
